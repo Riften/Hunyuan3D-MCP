@@ -1,7 +1,6 @@
-# Replace the absolute project path when installing elsewhere.
+# Install the Python package and make its command available on PATH first.
 [mcp_servers.hunyuan3d]
-command = "/home/yongxi/Workspace/Hunyuan3DMCP/.venv/bin/python"
-args = ["-m", "hunyuan3d_mcp"]
+command = "hunyuan3d-mcp"
 env_vars = ["HY3D_API_KEY", "HY3D_PROXY", "HY3D_TIMEOUT_SECONDS", "HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "NO_PROXY"]
 startup_timeout_sec = 20
 tool_timeout_sec = 180

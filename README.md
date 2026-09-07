@@ -1,6 +1,6 @@
 # Hunyuan 3D MCP Server
 
-在本地通过 MCP STDIO 为 Codex、Claude Code、Cursor 等 code agent 提供腾讯混元生 3D **专业版**生成服务。默认读取环境变量 `HY3D_API_KEY`，使用官方 Python MCP SDK。
+通过 MCP STDIO 为 Codex、Claude Code、Cursor 等 code agent 提供腾讯混元生 3D **专业版**生成服务。支持作为 Python 包独立安装，或通过仓库内的 **Codex plugin marketplace** 安装。默认读取 `HY3D_API_KEY`，使用官方 Python MCP SDK。本项目为社区集成，并非腾讯官方插件。
 
 ## 接口与认证
 
@@ -14,29 +14,52 @@
 | 认证 | `Authorization: <HY3D_API_KEY>`，不加 `Bearer` |
 | 版本 | 专业版，模型 `3.0`（默认）或 `3.1` |
 
-你提供的 [API 文档](https://cloud.tencent.com/document/api/1804/)还包含使用 SecretId/SecretKey 和 TC3 签名的 `ai3d.tencentcloudapi.com` 入口。API Key 不能直接用于该入口。本项目不实现 TC3、极速版或其他后处理接口。
+[API 文档](https://cloud.tencent.com/document/api/1804/)还包含使用 SecretId/SecretKey 和 TC3 签名的 `ai3d.tencentcloudapi.com` 入口。API Key 不能直接用于该入口。本项目不实现 TC3、极速版或其他后处理接口。
 
 认证与兼容格式依据[腾讯官方调用示例](https://cloud.tencent.com/document/product/1804/126189)，Key 的获取参见 [API Key 管理](https://cloud.tencent.com/document/product/1804/126325)。腾讯文档提示服务逐步迁移到 TokenHub，已有服务暂不受影响；本项目没有假设 TokenHub 与此入口可互换。
 
-## 安装
+## 安装前提
 
-要求 Python 3.11 或更新版本。在本项目目录运行：
+支持 Python 3.11+ 的 Windows、macOS 和 Linux 环境。插件安装需要 [uv](https://docs.astral.sh/uv/getting-started/installation/) 和支持 `codex plugin` 命令的 Codex 版本；Git marketplace 还需要 Git。请确保这些命令在 agent 进程的 `PATH` 中。
 
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
-.venv/bin/python -m hunyuan3d_mcp --check-config
-```
+在启动 agent 的环境中设置自己的 `HY3D_API_KEY`。首次启动会下载 Python 依赖，后续 API 调用需要能访问腾讯服务。插件不会创建或代管腾讯 API Key，也不提供 OAuth 登录流程。
 
-日常使用可改为 `pip install -e .`，不安装测试工具。本地环境已配置 `HY3D_API_KEY` 时无需再次设置。`--check-config` 只检查环境配置，不联网，不输出密钥；Key 缺失时退出码为 1。
+## Codex Marketplace 安装
 
-需要代理时：
+本仓库已经包含 marketplace 清单和完整插件。发布到 Git 托管平台后，将 `<repository-url>` 替换为实际仓库 URL：
 
 ```bash
-export HY3D_PROXY=http://127.0.0.1:7897
-# 安装依赖的代理独立配置：
-.venv/bin/python -m pip install --proxy http://127.0.0.1:7897 -e '.[dev]'
+codex plugin marketplace add <repository-url>
+codex plugin add hunyuan3d@hunyuan3d
 ```
+
+如果已经克隆仓库，也可直接在仓库根目录运行：
+
+```bash
+codex plugin marketplace add .
+codex plugin add hunyuan3d@hunyuan3d
+```
+
+安装后新建 Codex 会话，通过 `/plugins` 查看插件，调用 `hy3d_check_config` 检查 Key 是否可用。插件已配置 MCP 启动命令、环境变量转发和超时，不需要再手动注册相同的 MCP Server。
+
+插件通过 `${PLUGIN_ROOT}` 定位安装后的源码，并使用 `uv.lock` 安装依赖；虚拟环境存放在 `${PLUGIN_DATA}/venv`，不依赖源码检出位置或预先配置的虚拟环境。首次启动较慢时，可按[发布与部署说明](docs/distribution.md)预装依赖。
+
+这是可由 Git 仓库分发的 Codex marketplace，不代表已上架 OpenAI 官方公共目录。仓库 URL 在发布时确定，不在清单中绑定特定账号。Codex IDE 扩展等不支持插件的客户端可以使用以下独立 MCP 安装方式。
+
+## 独立 MCP 安装
+
+在仓库根目录运行：
+
+```bash
+uv tool install ./plugins/hunyuan3d
+hunyuan3d-mcp --check-config
+```
+
+`uv tool install` 将命令安装到独立环境；如 `PATH` 尚未配置，可运行 `uv tool update-shell`，然后重新打开终端。也可在自己管理的 Python 环境中运行 `python -m pip install ./plugins/hunyuan3d`。源码包位于 `plugins/hunyuan3d`，无需先发布到 PyPI。
+
+`--check-config` 不联网、不输出密钥；Key 缺失时退出码为 1。默认无参数启动 STDIO 服务，`python -m hunyuan3d_mcp` 是等价入口。
+
+## 环境配置
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -49,12 +72,11 @@ export HY3D_PROXY=http://127.0.0.1:7897
 
 ## 注册到 Codex
 
-推荐在 `~/.codex/config.toml` 增加以下配置，将路径替换为本项目的绝对路径。当前机器的路径是 `/home/yongxi/Workspace/Hunyuan3DMCP`。
+独立安装后，可在 Codex 的 `config.toml` 中添加以下配置，或参考 [examples/codex.toml](examples/codex.toml)：
 
 ```toml
 [mcp_servers.hunyuan3d]
-command = "/home/yongxi/Workspace/Hunyuan3DMCP/.venv/bin/python"
-args = ["-m", "hunyuan3d_mcp"]
+command = "hunyuan3d-mcp"
 env_vars = ["HY3D_API_KEY", "HY3D_PROXY", "HY3D_TIMEOUT_SECONDS", "HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "NO_PROXY"]
 startup_timeout_sec = 20
 tool_timeout_sec = 180
@@ -63,12 +85,12 @@ tool_timeout_sec = 180
 `env_vars` 显式转发父进程环境变量，不把 Key 值存入 TOML。也可以先运行 CLI 注册，再在生成的配置项里加入上述 `env_vars` 和超时配置：
 
 ```bash
-codex mcp add hunyuan3d -- /home/yongxi/Workspace/Hunyuan3DMCP/.venv/bin/python -m hunyuan3d_mcp
+codex mcp add hunyuan3d -- hunyuan3d-mcp
 codex mcp list
 codex mcp get hunyuan3d
 ```
 
-重启 Codex 会话后使用 `/mcp` 检查连接，并让 agent 调用 `hy3d_check_config`。`--check-config` 不能写进 MCP 启动参数，否则进程只会输出普通 JSON 后退出。也可以使用可信项目的 `.codex/config.toml`。参见 [Codex 官方 MCP 文档](https://developers.openai.com/codex/mcp)。可直接参考 [examples/codex.toml](examples/codex.toml)。
+重启 Codex 会话后使用 `/mcp` 检查连接，并调用 `hy3d_check_config`。`--check-config` 不能写进 MCP 启动参数，否则进程只会输出普通 JSON 后退出。配置文件位置和作用域参见 [Codex 官方 MCP 文档](https://developers.openai.com/codex/mcp)。
 
 ## 注册到其他 Agent
 
@@ -77,7 +99,7 @@ codex mcp get hunyuan3d
 从已包含 `HY3D_API_KEY`（及可选代理）的终端运行：
 
 ```bash
-claude mcp add --transport stdio --scope user hunyuan3d -- /home/yongxi/Workspace/Hunyuan3DMCP/.venv/bin/python -m hunyuan3d_mcp
+claude mcp add --transport stdio --scope user hunyuan3d -- hunyuan3d-mcp
 claude mcp list
 ```
 
@@ -85,14 +107,13 @@ claude mcp list
 
 ### Cursor
 
-将 [examples/cursor.json](examples/cursor.json) 的内容加入项目 `.cursor/mcp.json` 或用户 `~/.cursor/mcp.json`，按实际路径修改。示例通过 `${env:HY3D_API_KEY}` 读取环境变量。需要代理时在该配置的 `env` 中增加 `"HY3D_PROXY": "http://127.0.0.1:7897"`。
+将 [examples/cursor.json](examples/cursor.json) 的内容加入 Cursor 的 MCP 配置。示例通过 `${env:HY3D_API_KEY}` 读取环境变量：
 
 ```json
 {
   "mcpServers": {
     "hunyuan3d": {
-      "command": "/home/yongxi/Workspace/Hunyuan3DMCP/.venv/bin/python",
-      "args": ["-m", "hunyuan3d_mcp"],
+      "command": "hunyuan3d-mcp",
       "env": { "HY3D_API_KEY": "${env:HY3D_API_KEY}" }
     }
   }
@@ -126,19 +147,19 @@ claude mcp list
 }
 ```
 
-使用本地图像（会上传到腾讯服务）：
+使用图片 URL（替换为腾讯可访问的实际图片链接）：
 
 ```json
 {
   "request": {
-    "image_path": "/absolute/path/chair.png",
+    "image_url": "https://example.com/chair.png",
     "model": "3.1",
     "enable_pbr": true
   }
 }
 ```
 
-也支持 `image_url`（公网可访问 HTTP(S) URL）或 `image_base64`（原始 base64 / `data:image/...;base64,...`）。本地文件在服务端编码，不需要 agent 把大量 base64 写入上下文。兼容入口使用 `ImageUrl.Url`，本地图片统一转换为 data URI。
+也支持 `image_path`（MCP 进程所在机器上的绝对文件路径）或 `image_base64`（原始 base64 / `data:image/...;base64,...`）。本地文件在服务端编码后上传至腾讯，不需要 agent 把大量 base64 写入上下文。兼容入口使用 `ImageUrl.Url`，本地图片统一转换为 data URI。
 
 输入校验在提交前执行：图片为 JPEG/PNG/WebP，各边 128–5000 像素，原始数据最多 6 MiB，完整 JSON 最多 8 MiB。远程 URL 图片由腾讯读取，本地不会预下载；远程图片的实际尺寸和大小由腾讯验证。文字最多 1024 字符；文字和图片仅可在 `Sketch` 下组合；3.1 在兼容入口不支持 `LowPoly` / `Sketch`。当前工具支持单图，不封装多视角输入。
 
@@ -171,23 +192,21 @@ claude mcp list
 可选的真实认证检查只查询不存在的 JobId `0`，不会创建生成任务，但仍会占用一次查询请求：
 
 ```bash
-.venv/bin/python -m hunyuan3d_mcp --probe-auth
+hunyuan3d-mcp --probe-auth
 ```
-
-开发期间已用本机 Key 执行 **1 次真实查询**，得到 `FailedOperation.JobNotFound`，确认了认证和响应格式；**真实生成提交为 0 次**。生成、图像提交及轮询通过模拟 HTTP 和 MCP 协议测试验证，未进行付费端到端生成测试。
 
 ## 开发与验证
 
 ```bash
-.venv/bin/python -m pytest
-.venv/bin/ruff check .
-.venv/bin/ruff format --check .
-.venv/bin/python -m pip check
+uv sync --project plugins/hunyuan3d --locked
+uv run --project plugins/hunyuan3d --locked python -m pytest
+uv run --project plugins/hunyuan3d --locked ruff check .
+uv run --project plugins/hunyuan3d --locked ruff format --check .
 ```
 
 测试覆盖请求地址和认证头、参数互斥和图片校验、返回结构、费用字段、API/HTTP/网络异常、提交不重试、轮询上限与取消，以及真实 STDIO 进程的初始化、工具发现和调用。测试使用虚拟 Key 与模拟响应，不依赖真实环境中的 Key 或网络。
 
-目录：`src/hunyuan3d_mcp` 为实现，`tests` 为离线测试，`examples` 为 agent 注册配置。虚拟环境、缓存、`.env` 和输出模型均在 `.gitignore` 中。
+目录：`plugins/hunyuan3d` 是可独立部署的插件和 Python 包，`.agents/plugins/marketplace.json` 是 marketplace 入口，`tests` 为离线测试，`examples` 为其他 MCP 客户端配置。构建 wheel、发布 Git marketplace 和更新插件的步骤参见[发布与部署说明](docs/distribution.md)。
 
 ## 文档依据
 
@@ -197,5 +216,6 @@ claude mcp list
 - [专业版查询与结果](https://cloud.tencent.com/document/api/1804/123448)
 - [腾讯官方 Python SDK 参数定义](https://github.com/TencentCloud/tencentcloud-sdk-python/blob/master/tencentcloud/ai3d/v20250513/models.py)
 - [Codex MCP 注册文档](https://developers.openai.com/codex/mcp)
+- [Codex 插件与 marketplace 打包文档](https://developers.openai.com/plugins/build/plugins)
 
 接口信息核对日期：2026-09-08。兼容入口的模型限制和图片结构优先遵循该入口的专门文档。

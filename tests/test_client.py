@@ -178,7 +178,7 @@ async def test_invalid_poll_options(kwargs):
 
 def test_settings_hide_credentials(monkeypatch):
     monkeypatch.setenv("HY3D_API_KEY", KEY)
-    monkeypatch.setenv("HY3D_PROXY", "http://user:password@127.0.0.1:7897")
+    monkeypatch.setenv("HY3D_PROXY", "http://user:password@proxy.example.com:8080")
     settings = Settings.from_env()
     public = json.dumps(settings.public_info()) + repr(settings)
     assert KEY not in public and "password" not in public

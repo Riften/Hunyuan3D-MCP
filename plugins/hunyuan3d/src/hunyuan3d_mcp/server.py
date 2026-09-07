@@ -1,4 +1,4 @@
-"""STDIO tools for code agents."""
+"""STDIO tools shared by standalone MCP clients and the Codex plugin."""
 
 from contextlib import asynccontextmanager
 from typing import Annotated, Any

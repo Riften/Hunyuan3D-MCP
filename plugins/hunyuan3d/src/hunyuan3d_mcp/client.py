@@ -1,4 +1,4 @@
-"""Async API Key client. Submissions are intentionally never retried."""
+"""Async API Key client with environment-based configuration and no submission retries."""
 
 import asyncio
 import json

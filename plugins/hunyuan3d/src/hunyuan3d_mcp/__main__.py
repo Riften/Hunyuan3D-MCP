@@ -1,3 +1,5 @@
+"""Portable command-line entry point."""
+
 import argparse
 import asyncio
 import json

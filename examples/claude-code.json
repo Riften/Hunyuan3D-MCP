@@ -2,8 +2,7 @@
   "mcpServers": {
     "hunyuan3d": {
       "type": "stdio",
-      "command": "/home/yongxi/Workspace/Hunyuan3DMCP/.venv/bin/python",
-      "args": ["-m", "hunyuan3d_mcp"]
+      "command": "hunyuan3d-mcp"
     }
   }
 }

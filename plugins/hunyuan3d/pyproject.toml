@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hunyuan3d-mcp"
+version = "0.1.0"
+description = "MCP server for Tencent Hunyuan 3D using API Key authentication"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.26,<2",
+    "httpx>=0.28,<1",
+    "pydantic>=2.11,<3",
+    "pillow>=11,<13",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.12,<1"]
+
+[project.scripts]
+hunyuan3d-mcp = "hunyuan3d_mcp.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hunyuan3d_mcp"]

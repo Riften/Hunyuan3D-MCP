@@ -1,0 +1,20 @@
+{
+  "name": "hunyuan3d",
+  "interface": {
+    "displayName": "Hunyuan3d"
+  },
+  "plugins": [
+    {
+      "name": "hunyuan3d",
+      "source": {
+        "source": "local",
+        "path": "./plugins/hunyuan3d"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

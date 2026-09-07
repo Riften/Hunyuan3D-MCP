@@ -1,0 +1,17 @@
+{
+  "name": "hunyuan3d",
+  "version": "0.1.0",
+  "description": "Generate 3D assets from text or images with Tencent Hunyuan 3D Pro.",
+  "author": { "name": "Hunyuan 3D MCP contributors" },
+  "keywords": ["3d", "hunyuan", "mcp", "asset-generation"],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Hunyuan 3D",
+    "shortDescription": "Text and image to 3D assets with Hunyuan Pro",
+    "longDescription": "Submit 3D generation jobs, query their status, and retrieve model URLs and credit usage using your own Tencent Hunyuan API Key. Generation may incur charges.",
+    "developerName": "Hunyuan 3D MCP contributors",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": ["Generate a 3D asset with Hunyuan from my description."]
+  }
+}
