@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "hunyuan3d": {
+      "command": "/home/yongxi/Workspace/Hunyuan3DMCP/.venv/bin/python",
+      "args": ["-m", "hunyuan3d_mcp"],
+      "env": { "HY3D_API_KEY": "${env:HY3D_API_KEY}" }
+    }
+  }
+}
