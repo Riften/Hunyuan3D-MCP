@@ -46,12 +46,15 @@ export TENCENTCLOUD_SECRET_ID='your-secret-id'
 export TENCENTCLOUD_SECRET_KEY='your-secret-key'
 # Temporary credentials only:
 # export TENCENTCLOUD_TOKEN='your-session-token'
-# Optional region:
+# Region (the AI3D service region is Guangzhou; this is also the default):
 # export TENCENTCLOUD_REGION='ap-guangzhou'
 ```
 
 `hy3d_check_config` reports credential presence without exposing secrets or making requests.
 Presence does not verify account permission, service entitlement or quota.
+`TENCENTCLOUD_REGION` uses Tencent Cloud's region identifier. The AI3D service currently
+lists Guangzhou as `ap-guangzhou`; Shanghai is not a supported region for this API.
+When the variable is omitted, the server uses `ap-guangzhou` automatically.
 `hy3d_list_capabilities` provides examples, workflow guidance, motion presets and portrait templates.
 All service tools use Tencent Cloud TC3; `backend` defaults to `tc3`.
 

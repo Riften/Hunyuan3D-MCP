@@ -33,7 +33,8 @@ class Settings:
     secret_id: str = field(default="", repr=False)
     secret_key: str = field(default="", repr=False)
     token: str = field(default="", repr=False)
-    region: str = ""
+    # AI3D currently supports Guangzhou (per the service region list).
+    region: str = "ap-guangzhou"
 
     def __post_init__(self) -> None:
         if not math.isfinite(self.timeout_seconds) or not 1 <= self.timeout_seconds <= 120:
@@ -66,7 +67,7 @@ class Settings:
             secret_id=os.getenv("TENCENTCLOUD_SECRET_ID", "").strip(),
             secret_key=os.getenv("TENCENTCLOUD_SECRET_KEY", "").strip(),
             token=os.getenv("TENCENTCLOUD_TOKEN", "").strip(),
-            region=os.getenv("TENCENTCLOUD_REGION", "").strip(),
+            region=os.getenv("TENCENTCLOUD_REGION", "ap-guangzhou").strip() or "ap-guangzhou",
         )
 
     def public_info(self) -> dict:
