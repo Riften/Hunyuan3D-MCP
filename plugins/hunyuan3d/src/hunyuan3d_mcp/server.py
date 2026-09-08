@@ -9,7 +9,8 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from .client import HunyuanClient, HunyuanError, Settings
-from .models import GenerationInput
+from .service_tools import register_service_tools
+from .services import Backend, Service
 
 
 def create_server(settings: Settings | None = None) -> FastMCP:
@@ -23,12 +24,20 @@ def create_server(settings: Settings | None = None) -> FastMCP:
     server = FastMCP(
         "hunyuan3d",
         instructions=(
-            "Generate 3D assets with Tencent Hunyuan Pro. submit creates a potentially billable "
-            "job: call only when generation is requested, save JobId, and never automatically "
-            "resubmit after a timeout. Query that same JobId or wait with bounded polling. "
-            "WAIT/RUN are pending, DONE succeeds, FAIL is terminal. Return result URLs and "
-            "credit usage. Job IDs are valid for 24 hours. check_config is local and free. "
-            "Use absolute local image paths; credentials come only from HY3D_API_KEY."
+            "Use service-specific tools to generate models from text/images/sketches, low-poly "
+            "or untextured geometry, rapid models, textures, components, UVs, simplified meshes, "
+            "rigs, motion, portrait characters, and format conversion. hy3d_list_capabilities "
+            "provides examples and workflow guidance; hy3d_check_config is local and free. "
+            "All services require TENCENTCLOUD_SECRET_ID + TENCENTCLOUD_SECRET_KEY "
+            "(optional TENCENTCLOUD_TOKEN). "
+            "Submission tools create potentially billable jobs: save JobId/service/backend "
+            "and copy returned query.arguments or wait.arguments to query/wait. Never "
+            "automatically resubmit after an uncertain error. WAIT/RUN are pending, DONE/FAIL "
+            "terminal. Polling exhaustion does not cancel a job. Return files and any credit "
+            "usage. Download results within 24 hours. Conversion returns a URL directly. "
+            "Use absolute local image paths; existing model inputs require public HTTP(S) URLs. "
+            "Chain ResultFile3Ds[].Url and Type into the next tool's file.url/type after DONE. "
+            "All service tools use Tencent Cloud TC3 credentials."
         ),
         lifespan=lifespan,
         log_level="WARNING",
@@ -42,41 +51,33 @@ def create_server(settings: Settings | None = None) -> FastMCP:
         ),
     )
     def check_config() -> dict[str, Any]:
-        """Inspect local configuration without network requests or exposing the API Key."""
+        """Inspect credentials and service availability locally, without exposing secrets."""
         return config.public_info()
-
-    @server.tool(
-        name="hy3d_submit_job",
-        annotations=ToolAnnotations(
-            readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
-        ),
-    )
-    async def submit_job(request: GenerationInput, ctx: Context) -> dict[str, Any]:
-        """Submit ONE potentially billable Pro 3D generation job; returns JobId immediately.
-
-        Use prompt OR image_url/image_path/image_base64 (Sketch permits prompt plus image).
-        image_path must be absolute. Inputs are uploaded to Tencent. Models: 3.0 or 3.1;
-        LowPoly and Sketch require 3.0. Omit result_format for default OBJ/GLB outputs;
-        explicit formats: STL, USDZ, FBX. Never retry automatically if submission fails.
-        """
-        try:
-            return await ctx.request_context.lifespan_context.submit(request)
-        except (HunyuanError, ValueError, OSError) as exc:
-            raise ToolError(str(exc)) from None
 
     @server.tool(name="hy3d_query_job", annotations=read)
     async def query_job(
         job_id: Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[0-9]+$")],
         ctx: Context,
+        service: Annotated[
+            Service,
+            Field(description="Service returned by submission; defaults to pro."),
+        ] = "pro",
+        backend: Annotated[
+            Backend,
+            Field(description="Reuse submission backend: tc3; auto is accepted for compatibility."),
+        ] = "auto",
     ) -> dict[str, Any]:
         """Query an existing JobId ONCE. Return WAIT/RUN/DONE/FAIL, files and credit usage.
 
+        Copy query.arguments from submission: job_id, service and backend.
         Reuse the submitted JobId (valid for 24 hours). DONE/FAIL are terminal.
         ResultFile3Ds includes Type, Url and PreviewImageUrl. Download results promptly.
         """
         try:
-            return await ctx.request_context.lifespan_context.query(job_id)
-        except HunyuanError as exc:
+            return await ctx.request_context.lifespan_context.query(
+                job_id, service=service, backend=backend
+            )
+        except (HunyuanError, ValueError) as exc:
             raise ToolError(str(exc)) from None
 
     @server.tool(name="hy3d_wait_job", annotations=read)
@@ -85,9 +86,18 @@ def create_server(settings: Settings | None = None) -> FastMCP:
         ctx: Context,
         max_polls: Annotated[int, Field(ge=1, le=10)] = 3,
         poll_interval_seconds: Annotated[float, Field(ge=5, le=60)] = 10,
+        service: Annotated[
+            Service,
+            Field(description="Service returned by submission; defaults to pro."),
+        ] = "pro",
+        backend: Annotated[
+            Backend,
+            Field(description="Reuse submission backend: tc3; auto is accepted for compatibility."),
+        ] = "auto",
     ) -> dict[str, Any]:
         """Poll an EXISTING job, default at most 3 queries spaced 10 seconds apart.
 
+        Copy wait.arguments from submission, including service and backend.
         Stop on DONE or FAIL, propagate API errors without retries. If polling_exhausted
         is true the job is still pending, NOT cancelled. Query the same JobId later.
         For worst-case duration allow max_polls * request timeout + (max_polls - 1) *
@@ -95,9 +105,14 @@ def create_server(settings: Settings | None = None) -> FastMCP:
         """
         try:
             return await ctx.request_context.lifespan_context.wait(
-                job_id, max_polls=max_polls, poll_interval_seconds=poll_interval_seconds
+                job_id,
+                max_polls=max_polls,
+                poll_interval_seconds=poll_interval_seconds,
+                service=service,
+                backend=backend,
             )
         except (HunyuanError, ValueError) as exc:
             raise ToolError(str(exc)) from None
 
+    register_service_tools(server, config)
     return server

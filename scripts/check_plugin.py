@@ -31,7 +31,13 @@ async def check(source: Path, *, offline: bool = False) -> None:
 
         env = {key: os.environ[key] for key in config["env_vars"] if key in os.environ}
         env.update(config.get("env", {}))
-        env["HY3D_API_KEY"] = ""
+        for name in (
+            "TENCENTCLOUD_SECRET_ID",
+            "TENCENTCLOUD_SECRET_ID",
+            "TENCENTCLOUD_SECRET_KEY",
+            "TENCENTCLOUD_TOKEN",
+        ):
+            env[name] = ""
         if "UV_CACHE_DIR" in os.environ:
             env["UV_CACHE_DIR"] = os.environ["UV_CACHE_DIR"]
         if offline:
@@ -48,14 +54,18 @@ async def check(source: Path, *, offline: bool = False) -> None:
                     initialized = await session.initialize()
                     assert initialized.serverInfo.name == "hunyuan3d"
                     tools = await session.list_tools()
-                    assert len(tools.tools) == 4
+                    assert len(tools.tools) == 18
+                    assert {
+                        "hy3d_generate_texture",
+                        "hy3d_generate_parts",
+                        "hy3d_list_capabilities",
+                    } <= {tool.name for tool in tools.tools}
                     result = await session.call_tool("hy3d_check_config", {})
                     assert not result.isError
-                    assert result.structuredContent["api_key_configured"] is False
                     assert result.structuredContent["network_checked"] is False
                     missing_key = await session.call_tool("hy3d_query_job", {"job_id": "0"})
                     assert missing_key.isError
-                    assert "HY3D_API_KEY" in missing_key.content[0].text
+                    assert "TENCENTCLOUD_SECRET_ID" in missing_key.content[0].text
         assert (plugin / ".venv" / "pyvenv.cfg").is_file()
     print("Plugin relocation, dependency environment, and MCP STDIO checks passed; API calls: 0.")
 

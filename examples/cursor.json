@@ -2,7 +2,13 @@
   "mcpServers": {
     "hunyuan3d": {
       "command": "hunyuan3d-mcp",
-      "env": { "HY3D_API_KEY": "${env:HY3D_API_KEY}" }
+      "env": {
+        "TENCENTCLOUD_SECRET_ID": "${env:TENCENTCLOUD_SECRET_ID}",
+        "TENCENTCLOUD_SECRET_ID": "${env:TENCENTCLOUD_SECRET_ID}",
+        "TENCENTCLOUD_SECRET_KEY": "${env:TENCENTCLOUD_SECRET_KEY}",
+        "TENCENTCLOUD_TOKEN": "${env:TENCENTCLOUD_TOKEN}",
+        "TENCENTCLOUD_REGION": "${env:TENCENTCLOUD_REGION}"
+      }
     }
   }
 }

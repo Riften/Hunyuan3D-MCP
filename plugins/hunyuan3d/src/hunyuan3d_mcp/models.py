@@ -14,15 +14,22 @@ MAX_IMAGE_BYTES = 6 * 1024 * 1024
 MAX_REQUEST_BYTES = 8 * 1024 * 1024
 
 
-def validate_image(data: bytes) -> str:
-    if not data or len(data) > MAX_IMAGE_BYTES:
-        raise ValueError("Image must be nonempty and at most 6 MiB before base64 encoding.")
+def validate_image(
+    data: bytes,
+    *,
+    max_bytes: int = MAX_IMAGE_BYTES,
+    min_side: int = 128,
+    max_side: int = 5000,
+    formats: frozenset[str] = frozenset({"JPEG", "PNG", "WEBP"}),
+) -> str:
+    if not data or len(data) > max_bytes:
+        raise ValueError(f"Image must be nonempty and at most {max_bytes} bytes before encoding.")
     try:
         with Image.open(io.BytesIO(data)) as image:
-            if image.format not in {"JPEG", "PNG", "WEBP"}:
-                raise ValueError("Only JPEG, PNG and WebP images are supported.")
-            if not all(128 <= side <= 5000 for side in image.size):
-                raise ValueError("Each image dimension must be between 128 and 5000 pixels.")
+            if image.format not in formats:
+                raise ValueError(f"Supported image formats: {', '.join(sorted(formats))}.")
+            if not all(min_side <= side <= max_side for side in image.size):
+                raise ValueError(f"Each image dimension must be between {min_side} and {max_side}.")
             mime = Image.MIME[image.format]
             image.verify()
     except (OSError, SyntaxError, UnidentifiedImageError, Image.DecompressionBombError) as exc:

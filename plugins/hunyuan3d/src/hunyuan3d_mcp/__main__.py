@@ -31,7 +31,7 @@ def main() -> None:
         settings = Settings.from_env()
         if args.check_config:
             print(json.dumps(settings.public_info(), indent=2))
-            if not settings.api_key:
+            if not settings.tc3_configured:
                 sys.exit(1)
         elif args.probe_auth:
             print(json.dumps(asyncio.run(probe(settings)), ensure_ascii=False, indent=2))

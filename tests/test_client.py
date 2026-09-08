@@ -50,7 +50,10 @@ async def test_query_preserves_files_credits_and_failure():
         return httpx.Response(200, json=response)
 
     async with make_client(handler) as client:
-        assert await client.query("123") == {**response, "JobId": "123"}
+        result = await client.query("123")
+        assert all(result[key] == value for key, value in response.items())
+        assert result["JobId"] == "123"
+        assert result["query"]["arguments"]["backend"] == "api_key"
         response = {"Status": "FAIL", "ErrorCode": "GenerationFailed", "ErrorMessage": "Failed"}
         assert (await client.query("123"))["ErrorCode"] == "GenerationFailed"
 

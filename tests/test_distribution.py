@@ -38,7 +38,12 @@ def test_plugin_launch_uses_plugin_relative_cwd_and_forwards_key():
         "hunyuan3d-mcp",
     ]
     assert config["cwd"] == "."
-    assert "HY3D_API_KEY" in config["env_vars"]
+    assert {
+        "HY3D_API_KEY",
+        "TENCENTCLOUD_SECRET_ID",
+        "TENCENTCLOUD_SECRET_KEY",
+        "TENCENTCLOUD_TOKEN",
+    } <= set(config["env_vars"])
     assert "env" not in config
     assert "${PLUGIN_ROOT}" not in json.dumps(config)
     assert "${PLUGIN_DATA}" not in json.dumps(config)

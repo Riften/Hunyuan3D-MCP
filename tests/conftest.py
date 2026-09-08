@@ -4,7 +4,11 @@ import pytest
 @pytest.fixture(autouse=True)
 def isolated_env(monkeypatch):
     for name in (
-        "HY3D_API_KEY",
+        "TENCENTCLOUD_SECRET_ID",
+        "TENCENTCLOUD_SECRET_ID",
+        "TENCENTCLOUD_SECRET_KEY",
+        "TENCENTCLOUD_TOKEN",
+        "TENCENTCLOUD_REGION",
         "HY3D_PROXY",
         "HY3D_TIMEOUT_SECONDS",
         "HTTPS_PROXY",

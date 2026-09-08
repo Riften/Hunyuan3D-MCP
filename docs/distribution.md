@@ -22,7 +22,7 @@ MCP 配置使用 `cwd: "."`，由 Codex 将相对工作目录解析到安装后�
 ## 发布 Git Marketplace
 
 1. 将本仓库发布到可访问的 Git 地址。当前清单通过相对目录定位插件，发布时不必修改它。
-2. 给使用者提供仓库 URL，并要求安装 Git、uv 和支持插件的 Codex 版本，配置自己的 `HY3D_API_KEY`。
+2. 给使用者提供仓库 URL，并要求安装 Git、uv 和支持插件的 Codex 版本，配置自己的 `TENCENTCLOUD_SECRET_ID`（Pro），以及 `TENCENTCLOUD_SECRET_ID` / `TENCENTCLOUD_SECRET_KEY`（其他服务）。
 3. 使用者运行以下命令，将 `<repository-url>` 替换为实际地址：
 
 ```bash
@@ -44,7 +44,7 @@ codex plugin add hunyuan3d@hunyuan3d
 codex plugin list
 ```
 
-新建会话后调用 `hy3d_check_config`，应能列出四个工具并检查环境。安装和该检查不调用腾讯 API。`ON_INSTALL` 为 marketplace 策略，不会自动生成腾讯 Key，也不会弹出本项目实现的登录界面；Key 始终由部署环境提供。
+新建会话后调用 `hy3d_check_config`，应能列出 19 个工具并检查环境；`hy3d_list_capabilities` 提供服务说明和示例。安装和该检查不调用腾讯 API。`ON_INSTALL` 为 marketplace 策略，不会自动生成腾讯 Key，也不会弹出本项目实现的登录界面；Key 始终由部署环境提供。
 
 首次启动由 `uv` 按锁文件下载依赖，并在 Codex 的安装缓存副本中创建自己的 `.venv`；启动超时配置为 180 秒。执行本地 marketplace 安装前，插件源码目录不应包含开发用 `.venv`，因为本地安装会复制源码目录中的未跟踪文件。离线部署需要通过独立构建流程事先准备对应操作系统和 Python 版本的 uv 缓存；仅复制锁文件并不能离线安装依赖。腾讯 API 调用始终需要网络。
 
