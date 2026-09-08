@@ -31,6 +31,23 @@ hunyuan3d-mcp --check-config
 
 把 `hunyuan3d-mcp` 配置为任意 STDIO MCP 客户端的 command，并转发 `HY3D_API_KEY`。服务支持文本或图片生成、任务查询和结果获取。
 
+## MCP Inspector 调试
+
+安装 [Node.js](https://nodejs.org/) 后，可以使用官方 MCP Inspector 调试独立运行的 STDIO 服务。先安装命令并设置 API 密钥：
+
+```bash
+uv tool install ./plugins/hunyuan3d
+export HY3D_API_KEY='你的密钥'
+```
+
+从项目根目录启动 Inspector：
+
+```bash
+npx @modelcontextprotocol/inspector hunyuan3d-mcp
+```
+
+Inspector 会启动本地代理并打开 Web UI。在 UI 的 `Tools` 页面可以查看工具、填写参数并调用，也可以查看初始化、请求和响应日志。服务通过 STDIO 与 Inspector 通信，请勿向标准输出写入日志；结束调试时在终端按 `Ctrl-C`。如需只验证配置，可运行 `hunyuan3d-mcp --check-config`。
+
 ## 开发检查
 
 ```bash
