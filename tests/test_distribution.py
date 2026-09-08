@@ -33,6 +33,8 @@ def test_plugin_launch_uses_plugin_relative_cwd_and_forwards_key():
         "run",
         "--locked",
         "--no-dev",
+        "--python",
+        "3.11",
         "hunyuan3d-mcp",
     ]
     assert config["cwd"] == "."
