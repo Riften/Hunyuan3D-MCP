@@ -14,8 +14,9 @@ This is a community integration, not an official Tencent plugin.
 ## Codex Plugin
 
 Install `hunyuan3d` from the repository's `hunyuan3d` marketplace, then start a new session.
-The bundled `.mcp.json` starts this package from `${PLUGIN_ROOT}` using `uv.lock`.
-The virtual environment is stored in `${PLUGIN_DATA}/venv`; no checkout-specific path is needed.
+The bundled `.mcp.json` starts from the installed plugin root using a relative working directory
+and `uv.lock`. `uv` creates an isolated `.venv` in that installed plugin copy; no
+checkout-specific path is embedded in the configuration.
 The plugin forwards `HY3D_API_KEY` without storing its value in configuration files.
 The marketplace policy does not provision Tencent credentials or provide an OAuth flow.
 

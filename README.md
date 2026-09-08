@@ -42,7 +42,7 @@ codex plugin add hunyuan3d@hunyuan3d
 
 安装后新建 Codex 会话，通过 `/plugins` 查看插件，调用 `hy3d_check_config` 检查 Key 是否可用。插件已配置 MCP 启动命令、环境变量转发和超时，不需要再手动注册相同的 MCP Server。
 
-插件通过 `${PLUGIN_ROOT}` 定位安装后的源码，并使用 `uv.lock` 安装依赖；虚拟环境存放在 `${PLUGIN_DATA}/venv`，不依赖源码检出位置或预先配置的虚拟环境。首次启动较慢时，可按[发布与部署说明](docs/distribution.md)预装依赖。
+插件以安装后的插件根目录作为相对工作目录，并使用 `uv.lock` 安装依赖；虚拟环境位于该安装副本的 `.venv`，不依赖源码检出位置或预先配置的虚拟环境。首次启动较慢时，可按[发布与部署说明](docs/distribution.md)预装依赖。
 
 这是可由 Git 仓库分发的 Codex marketplace，不代表已上架 OpenAI 官方公共目录。仓库 URL 在发布时确定，不在清单中绑定特定账号。Codex IDE 扩展等不支持插件的客户端可以使用以下独立 MCP 安装方式。
 

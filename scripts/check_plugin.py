@@ -19,7 +19,6 @@ async def check(source: Path, *, offline: bool = False) -> None:
     with TemporaryDirectory(prefix="hunyuan3d deployment ") as directory:
         workspace = Path(directory)
         plugin = workspace / "plugin with spaces"
-        data = workspace / "plugin data"
         await asyncio.to_thread(
             shutil.copytree,
             source,
@@ -27,12 +26,11 @@ async def check(source: Path, *, offline: bool = False) -> None:
             ignore=shutil.ignore_patterns(".venv", "__pycache__", "dist", "build", ".git"),
         )
         config = json.loads((plugin / ".mcp.json").read_text())["mcpServers"]["hunyuan3d"]
-
-        def expand(value: str) -> str:
-            return value.replace("${PLUGIN_ROOT}", str(plugin)).replace("${PLUGIN_DATA}", str(data))
+        cwd = (plugin / config["cwd"]).resolve()
+        assert cwd == plugin.resolve()
 
         env = {key: os.environ[key] for key in config["env_vars"] if key in os.environ}
-        env.update({key: expand(value) for key, value in config["env"].items()})
+        env.update(config.get("env", {}))
         env["HY3D_API_KEY"] = ""
         if "UV_CACHE_DIR" in os.environ:
             env["UV_CACHE_DIR"] = os.environ["UV_CACHE_DIR"]
@@ -40,9 +38,9 @@ async def check(source: Path, *, offline: bool = False) -> None:
             env["UV_OFFLINE"] = "1"
         params = StdioServerParameters(
             command=uv,
-            args=[expand(arg) for arg in config["args"]],
+            args=config["args"],
             env=env,
-            cwd=str(workspace),
+            cwd=str(cwd),
         )
         async with asyncio.timeout(config["startup_timeout_sec"] + 30):
             async with stdio_client(params) as (read, write):
@@ -58,8 +56,7 @@ async def check(source: Path, *, offline: bool = False) -> None:
                     missing_key = await session.call_tool("hy3d_query_job", {"job_id": "0"})
                     assert missing_key.isError
                     assert "HY3D_API_KEY" in missing_key.content[0].text
-        assert (data / "venv" / "pyvenv.cfg").is_file()
-        assert not (plugin / ".venv").exists()
+        assert (plugin / ".venv" / "pyvenv.cfg").is_file()
     print("Plugin relocation, dependency environment, and MCP STDIO checks passed; API calls: 0.")
 
 

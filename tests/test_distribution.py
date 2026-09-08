@@ -16,7 +16,7 @@ def test_marketplace_points_to_self_contained_package():
     assert entry["name"] == plugin.name == "hunyuan3d"
     manifest = json.loads((plugin / ".codex-plugin/plugin.json").read_text())
     package = tomllib.loads((plugin / "pyproject.toml").read_text())
-    assert manifest["version"] == package["project"]["version"] == __version__
+    assert manifest["version"].split("+", 1)[0] == package["project"]["version"] == __version__
     assert (plugin / package["project"]["readme"]).is_file()
     assert (plugin / "src/hunyuan3d_mcp/__main__.py").is_file()
     lock = tomllib.loads((plugin / "uv.lock").read_text())
@@ -24,22 +24,22 @@ def test_marketplace_points_to_self_contained_package():
     assert distribution["source"] == {"editable": "."}
 
 
-def test_plugin_launch_uses_runtime_paths_and_forwards_key():
+def test_plugin_launch_uses_plugin_relative_cwd_and_forwards_key():
     plugin = ROOT / "plugins/hunyuan3d"
     manifest = json.loads((plugin / ".codex-plugin/plugin.json").read_text())
     config = json.loads((plugin / manifest["mcpServers"]).read_text())["mcpServers"]["hunyuan3d"]
     assert config["command"] == "uv"
     assert config["args"] == [
         "run",
-        "--directory",
-        "${PLUGIN_ROOT}",
         "--locked",
         "--no-dev",
         "hunyuan3d-mcp",
     ]
+    assert config["cwd"] == "."
     assert "HY3D_API_KEY" in config["env_vars"]
-    assert "HY3D_API_KEY" not in config["env"]
-    assert config["env"]["UV_PROJECT_ENVIRONMENT"] == "${PLUGIN_DATA}/venv"
+    assert "env" not in config
+    assert "${PLUGIN_ROOT}" not in json.dumps(config)
+    assert "${PLUGIN_DATA}" not in json.dumps(config)
 
 
 def test_standalone_examples_use_installed_entry_point():

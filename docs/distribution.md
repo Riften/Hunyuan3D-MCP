@@ -17,7 +17,7 @@ tests/
 
 marketplace 的 `source.path` 相对仓库根目录解析。Codex 将 `plugins/hunyuan3d` 复制到插件缓存，因此运行所需的源码、包元数据、README 和锁文件都放在该目录内。根目录 `pyproject.toml` 只管理测试和代码风格，Python 包的元数据位于插件目录。
 
-MCP 配置使用 Codex 提供的 `${PLUGIN_ROOT}` 和 `${PLUGIN_DATA}`：前者定位插件源码，后者保存可写虚拟环境。所有命令参数独立传递，不经过 shell 拼接，支持安装目录包含空格。没有系统专用启动脚本或预设的用户目录。
+MCP 配置使用 `cwd: "."`，由 Codex 将相对工作目录解析到安装后的插件根目录。`uv` 在该安装副本中创建 `.venv` 并按 `uv.lock` 启动服务。配置不依赖仅对插件 hooks 明确定义的 `${PLUGIN_ROOT}`、`${PLUGIN_DATA}` 变量，也不经过 shell 拼接或包含预设用户目录。
 
 ## 发布 Git Marketplace
 
@@ -46,17 +46,11 @@ codex plugin list
 
 新建会话后调用 `hy3d_check_config`，应能列出四个工具并检查环境。安装和该检查不调用腾讯 API。`ON_INSTALL` 为 marketplace 策略，不会自动生成腾讯 Key，也不会弹出本项目实现的登录界面；Key 始终由部署环境提供。
 
-首次启动由 `uv` 按锁文件下载依赖并创建环境，启动超时配置为 180 秒。网络较慢时，可在安装前从仓库根目录执行：
-
-```bash
-uv sync --project plugins/hunyuan3d --locked --no-dev
-```
-
-这会预热 uv 缓存。插件正式启动时仍使用自己的 `${PLUGIN_DATA}/venv`，不会依赖开发目录的虚拟环境。离线部署需要事先准备对应操作系统和 Python 版本的 uv 缓存；仅复制锁文件并不能离线安装依赖。腾讯 API 调用始终需要网络。
+首次启动由 `uv` 按锁文件下载依赖，并在 Codex 的安装缓存副本中创建自己的 `.venv`；启动超时配置为 180 秒。执行本地 marketplace 安装前，插件源码目录不应包含开发用 `.venv`，因为本地安装会复制源码目录中的未跟踪文件。离线部署需要通过独立构建流程事先准备对应操作系统和 Python 版本的 uv 缓存；仅复制锁文件并不能离线安装依赖。腾讯 API 调用始终需要网络。
 
 ## 更新版本
 
-发布新版时同步更新 `plugins/hunyuan3d/pyproject.toml`、`.codex-plugin/plugin.json` 和 `src/hunyuan3d_mcp/__init__.py` 的版本，重新生成锁文件并执行检查：
+发布正式新版时，移除 `.codex-plugin/plugin.json` 中仅供本地迭代使用的 `+codex.*` cachebuster，并同步更新 `plugins/hunyuan3d/pyproject.toml`、插件 manifest 和 `src/hunyuan3d_mcp/__init__.py` 的基础版本。随后重新生成锁文件并执行检查：
 
 ```bash
 uv lock --project plugins/hunyuan3d
