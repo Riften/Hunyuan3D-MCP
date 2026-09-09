@@ -31,7 +31,7 @@ uv tool install ./plugins/hunyuan3d
 hunyuan3d-mcp --check-config
 ```
 
-把 `hunyuan3d-mcp` 配置为任意 STDIO MCP 客户端的 command，并转发腾讯云凭据环境变量。服务提供 14 个按用途划分的服务工具，另有能力发现、配置检查和任务查询工具。
+把 `hunyuan3d-mcp` 配置为任意 STDIO MCP 客户端的 command，并转发腾讯云凭据环境变量。服务提供 15 个按用途划分的服务工具（共 19 个工具），另有能力发现、配置检查和任务查询工具。
 
 ## 服务工具与调用流程
 
@@ -41,11 +41,18 @@ Agent 可以直接通过 MCP 工具描述和参数 schema 选择服务，不需�
 | 用途 | 工具 |
 | --- | --- |
 | 文本 / 图片 / 草图生成模型 | `hy3d_generate_model_from_text` / `hy3d_generate_model_from_image` / `hy3d_generate_model_from_sketch` |
+| 多视角参考生成模型 | `hy3d_generate_model_from_multiview` |
 | 低多边形 / 白模 / 极速版 | `hy3d_generate_low_poly_model` / `hy3d_generate_geometry` / `hy3d_generate_rapid_model` |
 | 纹理生成 / 组件生成 | `hy3d_generate_texture` / `hy3d_generate_parts` |
 | UV 展开 / 智能减面 | `hy3d_unwrap_uv` / `hy3d_reduce_faces` |
 | 绑骨蒙皮 / 动作 / 头像人物 | `hy3d_rig_model` / `hy3d_generate_motion` / `hy3d_generate_profile_model` |
 | 格式转换、预览视频 | `hy3d_convert_format` |
+
+业务参数直接放在顶层，例如 `{"prompt":"一把椅子","model":"3.1"}`，不再使用
+`request` 包装或提交时的 `backend` 参数；`image`、`file` 等保留结构化对象。
+多视角生成使用独立工具，必填主图 `image` 和 1–7 张额外视图 `multi_view_images`，
+默认模型 3.1。同一角度不可重复；3.0 仅支持额外的左、右、后视图。
+原先向单图工具传额外视图的调用应迁移到多视角工具。
 
 生成工具返回 `JobId`、`service`、`backend`，以及可直接复制给 `hy3d_query_job` 或
 `hy3d_wait_job` 的参数。完成后可以把结果模型 URL 传给纹理、组件等后续工具。

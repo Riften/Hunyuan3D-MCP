@@ -14,8 +14,26 @@ class Input(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+def exclusive_source_schema(*names: str) -> dict:
+    """Describe exactly one non-null source; mirror the runtime validators."""
+    return {
+        "oneOf": [
+            {
+                "required": [selected],
+                "properties": {
+                    name: {"not": {"type": "null"}} if name == selected else {"type": "null"}
+                    for name in names
+                },
+            }
+            for selected in names
+        ]
+    }
+
+
 class ImageSource(Input):
     """Exactly one image source. Local files are encoded and uploaded to Tencent."""
+
+    model_config = ConfigDict(json_schema_extra=exclusive_source_schema("url", "path", "base64"))
 
     url: str | None = Field(
         None,
@@ -154,7 +172,7 @@ class ProOptions(Input):
     def to_payload(self) -> dict:
         # Compatibility endpoint shape; the client adapts ImageUrl for TC3.
         payload = self.generation().to_payload()
-        if isinstance(self, ImageTo3DInput) and self.multi_view_images:
+        if isinstance(self, MultiViewTo3DInput):
             payload["MultiViewImages"] = [view.payload() for view in self.multi_view_images]
         return payload
 
@@ -170,12 +188,19 @@ class ImageTo3DInput(ProOptions):
     image: ImageSource = Field(
         description="Front/main image; JPEG/PNG/WebP, 128–5000 px, local ≤6 MiB."
     )
-    multi_view_images: list[ViewImage] = Field(
-        default_factory=list,
-        max_length=7,
-        description="Optional additional views; requires TC3.",
-    )
     enable_pbr: bool = Field(False, description="Generate physically based rendering materials.")
+
+
+class MultiViewTo3DInput(ImageTo3DInput):
+    model: Literal["3.0", "3.1"] = Field(
+        "3.1", description="Pro model; 3.0 only supports additional left/right/back views."
+    )
+    multi_view_images: list[ViewImage] = Field(
+        min_length=1,
+        max_length=7,
+        description="1–7 additional views of the SAME object, besides the main/front image. "
+        "Each angle once; top/bottom/left_front/right_front require model 3.1.",
+    )
 
     @model_validator(mode="after")
     def views_valid(self) -> Self:
@@ -203,6 +228,8 @@ class SketchTo3DInput(Input):
 
 
 class PromptOrImage(Input):
+    model_config = ConfigDict(json_schema_extra=exclusive_source_schema("prompt", "image"))
+
     prompt: str | None = Field(
         None,
         min_length=1,

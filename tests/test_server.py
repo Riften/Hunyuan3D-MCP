@@ -12,10 +12,8 @@ async def test_mcp_generation_workflow_with_mock_http(monkeypatch):
 
     def handler(request):
         calls.append(request)
-        if request.url.path.endswith("submit"):
-            assert json.loads(request.content)["ImageUrl"] == {
-                "Url": "https://example.com/chair.png"
-            }
+        if request.headers["X-TC-Action"] == "SubmitHunyuanTo3DProJob":
+            assert json.loads(request.content)["ImageUrl"] == "https://example.com/chair.png"
             return httpx.Response(200, json={"Response": {"JobId": "123"}})
         assert json.loads(request.content) == {"JobId": "123"}
         return httpx.Response(
@@ -33,15 +31,11 @@ async def test_mcp_generation_workflow_with_mock_http(monkeypatch):
         "hunyuan3d_mcp.server.HunyuanClient",
         lambda config: HunyuanClient(config, transport=httpx.MockTransport(handler)),
     )
-    server = create_server(Settings(api_key="sk-test-only"))
+    server = create_server(Settings(secret_id="test-id", secret_key="test-secret"))
     async with create_connected_server_and_client_session(server) as session:
         submitted = await session.call_tool(
-            "hy3d_submit_job",
-            {
-                "request": {
-                    "image_url": "https://example.com/chair.png",
-                }
-            },
+            "hy3d_generate_model_from_image",
+            {"image": {"url": "https://example.com/chair.png"}},
         )
         assert not submitted.isError
         job_id = submitted.structuredContent["JobId"]
@@ -74,7 +68,7 @@ async def test_mcp_business_error(monkeypatch):
         ),
     )
     async with create_connected_server_and_client_session(
-        create_server(Settings(api_key="sk-test-only"))
+        create_server(Settings(secret_id="test-id", secret_key="test-secret"))
     ) as session:
         result = await session.call_tool("hy3d_query_job", {"job_id": "0"})
         assert result.isError

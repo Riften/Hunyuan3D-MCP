@@ -39,7 +39,6 @@ def test_plugin_launch_uses_plugin_relative_cwd_and_forwards_key():
     ]
     assert config["cwd"] == "."
     assert {
-        "HY3D_API_KEY",
         "TENCENTCLOUD_SECRET_ID",
         "TENCENTCLOUD_SECRET_KEY",
         "TENCENTCLOUD_TOKEN",

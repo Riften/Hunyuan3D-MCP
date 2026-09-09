@@ -15,6 +15,7 @@ from hunyuan3d_mcp.service_models import (
     ImageSource,
     ImageTo3DInput,
     MotionInput,
+    MultiViewTo3DInput,
     PartsInput,
     ProfileInput,
     RapidInput,
@@ -43,6 +44,19 @@ CASES = [
         "SubmitHunyuanTo3DProJob",
         "QueryHunyuanTo3DProJob",
         {"ImageUrl": IMAGE["url"], "GenerateType": "Normal"},
+    ),
+    (
+        "generate_model_from_multiview",
+        {"image": IMAGE, "multi_view_images": [{"view": "top", "image": IMAGE}]},
+        "pro",
+        "SubmitHunyuanTo3DProJob",
+        "QueryHunyuanTo3DProJob",
+        {
+            "ImageUrl": IMAGE["url"],
+            "Model": "3.1",
+            "GenerateType": "Normal",
+            "MultiViewImages": [{"ViewType": "top", "ViewImageUrl": IMAGE["url"]}],
+        },
     ),
     (
         "generate_model_from_sketch",
@@ -196,7 +210,7 @@ async def test_each_service_through_mcp(
         lambda config: HunyuanClient(config, transport=httpx.MockTransport(handler)),
     )
     async with create_connected_server_and_client_session(create_server(SETTINGS)) as session:
-        result = await session.call_tool("hy3d_" + tool, {"request": request_args})
+        result = await session.call_tool("hy3d_" + tool, request_args)
         assert not result.isError, result
         job = result.structuredContent
         assert job["service"] == service and job["backend"] == "tc3"
@@ -227,9 +241,7 @@ async def test_conversion_returns_url_without_job(monkeypatch):
         ),
     )
     async with create_connected_server_and_client_session(create_server(SETTINGS)) as session:
-        result = await session.call_tool(
-            "hy3d_convert_format", {"request": {"file": FILE, "format": "FBX"}}
-        )
+        result = await session.call_tool("hy3d_convert_format", {"file": FILE, "format": "FBX"})
         assert not result.isError
         assert result.structuredContent == {"ResultFile3D": "https://example.com/a.fbx"}
     assert len(calls) == 1
@@ -244,7 +256,7 @@ async def test_discovery_and_missing_cloud_credentials_are_local(monkeypatch):
         ),
     )
     async with create_connected_server_and_client_session(
-        create_server(Settings(api_key="test-api-key")),
+        create_server(Settings()),
     ) as session:
         tools = {tool.name: tool for tool in (await session.list_tools()).tools}
         assert len(tools) == 19
@@ -262,14 +274,12 @@ async def test_discovery_and_missing_cloud_credentials_are_local(monkeypatch):
                 assert tool.annotations.idempotentHint is False
         capabilities = await session.call_tool("hy3d_list_capabilities", {})
         for item in capabilities.structuredContent["services"]:
-            assert item["credentials_configured"] == (item["service"] == "pro")
+            assert item["credentials_configured"] is False
             assert item["tool"] in tools
-        missing = await session.call_tool(
-            "hy3d_generate_texture", {"request": {"file": FILE, "prompt": "red"}}
-        )
+        missing = await session.call_tool("hy3d_generate_texture", {"file": FILE, "prompt": "red"})
         assert missing.isError
         assert "TENCENTCLOUD_SECRET_ID" in missing.content[0].text
-        invalid = await session.call_tool("hy3d_generate_parts", {"request": {"file": FILE}})
+        invalid = await session.call_tool("hy3d_generate_parts", {"file": FILE})
         assert invalid.isError
         wrong_query = await session.call_tool(
             "hy3d_query_job", {"job_id": "123", "service": "texture", "backend": "api_key"}
@@ -283,32 +293,26 @@ def encoded_image(size=(128, 128), fmt="PNG"):
     return base64.b64encode(stream.getvalue()).decode()
 
 
-@pytest.mark.parametrize("backend", ["api_key", "tc3"])
-async def test_pro_local_image_wire_shape(tmp_path, backend):
+async def test_pro_local_image_wire_shape(tmp_path):
     image = tmp_path / "chair.png"
     image.write_bytes(base64.b64decode(encoded_image()))
 
     def handler(req):
         body = json.loads(req.content)
-        if backend == "api_key":
-            assert req.url.path == "/v1/ai3d/submit"
-            assert body["ImageUrl"] == {"Url": "data:image/png;base64," + encoded_image()}
-            assert req.headers["Authorization"] == "api-key"
-        else:
-            assert req.headers["X-TC-Action"] == "SubmitHunyuanTo3DProJob"
-            assert body["ImageBase64"] == encoded_image()
-            assert "ImageUrl" not in body
+        assert req.headers["X-TC-Action"] == "SubmitHunyuanTo3DProJob"
+        assert body["ImageBase64"] == encoded_image()
+        assert "ImageUrl" not in body
         return httpx.Response(200, json={"JobId": "123"})
 
-    config = Settings(api_key="api-key", secret_id="test-id", secret_key="test-secret")
+    config = SETTINGS
     async with HunyuanClient(config, transport=httpx.MockTransport(handler)) as client:
         await client.submit_service(
-            "pro", ImageTo3DInput(image=ImageSource(path=str(image))), backend=backend
+            "pro", ImageTo3DInput(image=ImageSource(path=str(image))), backend="tc3"
         )
 
 
 async def test_multi_view_payload_and_api_key_rejection():
-    request = ImageTo3DInput.model_validate(
+    request = MultiViewTo3DInput.model_validate(
         {
             "image": IMAGE,
             "model": "3.1",
@@ -328,7 +332,7 @@ async def test_multi_view_payload_and_api_key_rejection():
         return httpx.Response(200, json={"JobId": "123"})
 
     async with HunyuanClient(SETTINGS, transport=httpx.MockTransport(handler)) as client:
-        with pytest.raises(ValueError, match="Multi-view"):
+        with pytest.raises(ValueError, match="backend"):
             await client.submit_service("pro", request, backend="api_key")
         await client.submit_service("pro", request, backend="tc3")
     assert len(calls) == 1
@@ -497,4 +501,161 @@ def test_cli_check_config_accepts_cloud_credentials_without_api_key(monkeypatch,
     main()
     result = json.loads(capsys.readouterr().out)
     assert result["tc3_configured"] is True
-    assert result["api_key_configured"] is False
+    assert "api_key_configured" not in result
+
+
+async def test_flat_tool_schema_and_capability_examples():
+    from jsonschema import Draft202012Validator
+
+    async with create_connected_server_and_client_session(create_server(SETTINGS)) as session:
+        tools = {tool.name: tool for tool in (await session.list_tools()).tools}
+        capabilities = await session.call_tool("hy3d_list_capabilities", {})
+        services = capabilities.structuredContent["services"]
+        assert len(services) == 15
+        for entry in services:
+            schema = tools[entry["tool"]].inputSchema
+            Draft202012Validator.check_schema(schema)
+            properties = schema["properties"]
+            assert not {"request", "arguments", "ctx", "backend"} & properties.keys()
+            assert schema["additionalProperties"] is False
+            assert all(field.get("description") for field in properties.values())
+            Draft202012Validator(schema).validate(entry["example"])
+        text_schema = tools["hy3d_generate_model_from_text"].inputSchema
+        assert text_schema["required"] == ["prompt"]
+        assert text_schema["properties"]["prompt"]["maxLength"] == 1024
+        assert text_schema["properties"]["model"]["enum"] == ["3.0", "3.1"]
+        assert text_schema["properties"]["enable_pbr"]["default"] is False
+        single = tools["hy3d_generate_model_from_image"].inputSchema
+        assert "multi_view_images" not in single["properties"]
+        multi = tools["hy3d_generate_model_from_multiview"].inputSchema
+        assert set(multi["required"]) == {"image", "multi_view_images"}
+        assert multi["properties"]["multi_view_images"]["minItems"] == 1
+        assert multi["properties"]["multi_view_images"]["maxItems"] == 7
+        assert multi["properties"]["model"]["default"] == "3.1"
+        geometry = tools["hy3d_generate_geometry"].inputSchema
+        validator = Draft202012Validator(geometry)
+        assert validator.is_valid({"prompt": "chair", "image": None})
+        assert not validator.is_valid({})
+        assert not validator.is_valid({"prompt": "chair", "image": IMAGE})
+        assert not validator.is_valid({"image": {"url": IMAGE["url"], "base64": "abc"}})
+
+
+@pytest.mark.parametrize(
+    "tool,arguments",
+    [
+        ("generate_model_from_text", {"request": {"prompt": "chair"}}),
+        ("generate_model_from_text", {"prompt": "chair", "backend": "tc3"}),
+        ("generate_model_from_text", {"prompt": "chair", "face_count": 1}),
+        (
+            "generate_model_from_image",
+            {"image": IMAGE, "multi_view_images": [{"view": "back", "image": IMAGE}]},
+        ),
+        ("generate_model_from_multiview", {"image": IMAGE}),
+        ("generate_model_from_multiview", {"image": IMAGE, "multi_view_images": []}),
+        (
+            "generate_model_from_multiview",
+            {"multi_view_images": [{"view": "back", "image": IMAGE}]},
+        ),
+        (
+            "generate_model_from_multiview",
+            {"image": IMAGE, "multi_view_images": [{"view": "back", "image": IMAGE}] * 2},
+        ),
+        (
+            "generate_model_from_multiview",
+            {"image": IMAGE, "multi_view_images": [{"view": "back", "image": IMAGE}] * 8},
+        ),
+        (
+            "generate_model_from_multiview",
+            {"image": IMAGE, "multi_view_images": [{"view": "front", "image": IMAGE}]},
+        ),
+        (
+            "generate_model_from_multiview",
+            {
+                "image": IMAGE,
+                "model": "3.0",
+                "multi_view_images": [{"view": "top", "image": IMAGE}],
+            },
+        ),
+        ("generate_geometry", {"prompt": "chair", "image": IMAGE}),
+        ("generate_rapid_model", {"prompt": "chair", "enable_geometry": True, "enable_pbr": True}),
+        (
+            "generate_texture",
+            {
+                "file": FILE,
+                "prompt": "red",
+                "multi_view_images": [{"view": "back", "image": IMAGE}],
+                "model": "3.1",
+            },
+        ),
+        ("rig_model", {"file": FILE, "motion_type": True}),
+    ],
+)
+async def test_invalid_flat_inputs_do_not_submit(monkeypatch, tool, arguments):
+    monkeypatch.setattr(
+        "hunyuan3d_mcp.server.HunyuanClient",
+        lambda config: HunyuanClient(
+            config,
+            transport=httpx.MockTransport(
+                lambda _: pytest.fail("Invalid arguments must not reach Tencent")
+            ),
+        ),
+    )
+    async with create_connected_server_and_client_session(create_server(SETTINGS)) as session:
+        result = await session.call_tool("hy3d_" + tool, arguments)
+        assert result.isError
+
+
+@pytest.mark.parametrize(
+    "model,views",
+    [
+        ("3.0", ["left", "right", "back"]),
+        ("3.1", ["left", "right", "back", "top", "bottom", "left_front", "right_front"]),
+    ],
+)
+async def test_multiview_angles_and_local_main_image(monkeypatch, tmp_path, model, views):
+    path = tmp_path / "front.png"
+    path.write_bytes(base64.b64decode(encoded_image()))
+    calls = []
+
+    def handler(req):
+        body = json.loads(req.content)
+        calls.append(body)
+        assert req.headers["X-TC-Action"] == "SubmitHunyuanTo3DProJob"
+        assert body["ImageBase64"] == encoded_image()
+        assert body["Model"] == model
+        assert body["MultiViewImages"] == [
+            {"ViewType": view, "ViewImageUrl": IMAGE["url"]} for view in views
+        ]
+        return httpx.Response(200, json={"Response": {"JobId": "123"}})
+
+    monkeypatch.setattr(
+        "hunyuan3d_mcp.server.HunyuanClient",
+        lambda config: HunyuanClient(config, transport=httpx.MockTransport(handler)),
+    )
+    async with create_connected_server_and_client_session(create_server(SETTINGS)) as session:
+        result = await session.call_tool(
+            "hy3d_generate_model_from_multiview",
+            {
+                "image": {"path": str(path)},
+                "model": model,
+                "multi_view_images": [{"view": view, "image": IMAGE} for view in views],
+            },
+        )
+        assert not result.isError, result
+        assert result.structuredContent["service"] == "pro"
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("prompt", ["null", "true", '{"color":"red"}'])
+async def test_optional_prompt_remains_literal_text(monkeypatch, prompt):
+    def handler(req):
+        assert json.loads(req.content)["Prompt"] == prompt
+        return httpx.Response(200, json={"Response": {"JobId": "123"}})
+
+    monkeypatch.setattr(
+        "hunyuan3d_mcp.server.HunyuanClient",
+        lambda config: HunyuanClient(config, transport=httpx.MockTransport(handler)),
+    )
+    async with create_connected_server_and_client_session(create_server(SETTINGS)) as session:
+        result = await session.call_tool("hy3d_generate_texture", {"file": FILE, "prompt": prompt})
+        assert not result.isError, result

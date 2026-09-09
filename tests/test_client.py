@@ -13,7 +13,9 @@ KEY = "sk-test-only-not-a-real-key"
 
 
 def make_client(handler):
-    return HunyuanClient(Settings(api_key=KEY), transport=httpx.MockTransport(handler))
+    return HunyuanClient(
+        Settings(secret_id="test-id", secret_key=KEY), transport=httpx.MockTransport(handler)
+    )
 
 
 async def test_submit_wire_contract():
@@ -21,17 +23,19 @@ async def test_submit_wire_contract():
 
     def handler(request):
         calls.append(request)
-        assert str(request.url) == "https://api.ai3d.cloud.tencent.com/v1/ai3d/submit"
-        assert request.headers["Authorization"] == KEY
+        assert str(request.url) == "https://ai3d.tencentcloudapi.com/"
+        assert request.headers["Authorization"].startswith("TC3-HMAC-SHA256 Credential=test-id/")
+        assert request.headers["X-TC-Action"] == "SubmitHunyuanTo3DProJob"
         assert request.headers["Content-Type"] == "application/json"
         assert json.loads(request.content)["Prompt"] == "chair"
         return httpx.Response(200, json={"Response": {"JobId": "123", "RequestId": "request-1"}})
 
     async with make_client(handler) as client:
-        assert await client.submit(GenerationInput(prompt="chair")) == {
-            "JobId": "123",
-            "RequestId": "request-1",
-        }
+        result = await client.submit_service("pro", GenerationInput(prompt="chair"))
+        assert result["JobId"] == "123"
+        assert result["RequestId"] == "request-1"
+        assert result["service"] == "pro"
+        assert result["backend"] == "tc3"
     assert len(calls) == 1
 
 
@@ -45,7 +49,7 @@ async def test_query_preserves_files_credits_and_failure():
     }
 
     def handler(request):
-        assert request.url.path == "/v1/ai3d/query"
+        assert request.headers["X-TC-Action"] == "QueryHunyuanTo3DProJob"
         assert json.loads(request.content) == {"JobId": "123"}
         return httpx.Response(200, json=response)
 
@@ -53,7 +57,7 @@ async def test_query_preserves_files_credits_and_failure():
         result = await client.query("123")
         assert all(result[key] == value for key, value in response.items())
         assert result["JobId"] == "123"
-        assert result["query"]["arguments"]["backend"] == "api_key"
+        assert result["query"]["arguments"]["backend"] == "tc3"
         response = {"Status": "FAIL", "ErrorCode": "GenerationFailed", "ErrorMessage": "Failed"}
         assert (await client.query("123"))["ErrorCode"] == "GenerationFailed"
 
@@ -78,7 +82,7 @@ async def test_uncertain_submissions_never_retry(kind):
 
     async with make_client(handler) as client:
         with pytest.raises(HunyuanError, match="Do not automatically resubmit") as error:
-            await client.submit(GenerationInput(prompt="chair"))
+            await client.submit_service("pro", GenerationInput(prompt="chair"))
         assert KEY not in str(error.value)
     assert len(calls) == 1
 
@@ -112,10 +116,10 @@ async def test_malformed_query_response(response):
 
 async def test_missing_key_does_not_send():
     def handler(_):
-        pytest.fail("No request should be sent without an API Key")
+        pytest.fail("No request should be sent without cloud credentials")
 
     async with HunyuanClient(Settings(), transport=httpx.MockTransport(handler)) as client:
-        with pytest.raises(HunyuanError, match="HY3D_API_KEY"):
+        with pytest.raises(HunyuanError, match="TENCENTCLOUD_SECRET_ID"):
             await client.query("123")
 
 
@@ -180,12 +184,13 @@ async def test_invalid_poll_options(kwargs):
 
 
 def test_settings_hide_credentials(monkeypatch):
-    monkeypatch.setenv("HY3D_API_KEY", KEY)
+    monkeypatch.setenv("TENCENTCLOUD_SECRET_ID", "test-id")
+    monkeypatch.setenv("TENCENTCLOUD_SECRET_KEY", KEY)
     monkeypatch.setenv("HY3D_PROXY", "http://user:password@proxy.example.com:8080")
     settings = Settings.from_env()
     public = json.dumps(settings.public_info()) + repr(settings)
     assert KEY not in public and "password" not in public
-    assert settings.public_info()["api_key_configured"] is True
+    assert settings.public_info()["tc3_configured"] is True
     assert settings.public_info()["network_checked"] is False
 
 
@@ -199,7 +204,7 @@ def test_invalid_timeout(monkeypatch, value):
 async def test_probe_uses_one_query_only(monkeypatch):
     query = AsyncMock(side_effect=HunyuanError("query: FailedOperation.JobNotFound: missing"))
     monkeypatch.setattr(HunyuanClient, "query", query)
-    result = await probe(Settings(api_key=KEY))
+    result = await probe(Settings(secret_id="test-id", secret_key=KEY))
     query.assert_awaited_once_with("0")
     assert result["authenticated"] is True
     assert result["generation_jobs_created"] == 0

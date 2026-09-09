@@ -54,8 +54,9 @@ async def check(source: Path, *, offline: bool = False) -> None:
                     initialized = await session.initialize()
                     assert initialized.serverInfo.name == "hunyuan3d"
                     tools = await session.list_tools()
-                    assert len(tools.tools) == 18
+                    assert len(tools.tools) == 19
                     assert {
+                        "hy3d_generate_model_from_multiview",
                         "hy3d_generate_texture",
                         "hy3d_generate_parts",
                         "hy3d_list_capabilities",

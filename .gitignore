@@ -13,3 +13,4 @@ build/
 !.env.example
 outputs/
 .DS_Store
+.codex

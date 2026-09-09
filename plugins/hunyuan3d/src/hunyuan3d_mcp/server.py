@@ -9,7 +9,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from .client import HunyuanClient, HunyuanError, Settings
-from .service_tools import register_service_tools
+from .service_tools import create_service_tools, register_capability_tool
 from .services import Backend, Service
 
 
@@ -24,7 +24,8 @@ def create_server(settings: Settings | None = None) -> FastMCP:
     server = FastMCP(
         "hunyuan3d",
         instructions=(
-            "Use service-specific tools to generate models from text/images/sketches, low-poly "
+            "Use service-specific tools to generate models from text, single images, multiple "
+            "views or sketches, low-poly "
             "or untextured geometry, rapid models, textures, components, UVs, simplified meshes, "
             "rigs, motion, portrait characters, and format conversion. hy3d_list_capabilities "
             "provides examples and workflow guidance; hy3d_check_config is local and free. "
@@ -40,6 +41,7 @@ def create_server(settings: Settings | None = None) -> FastMCP:
             "All service tools use Tencent Cloud TC3 credentials."
         ),
         lifespan=lifespan,
+        tools=create_service_tools(),
         log_level="WARNING",
     )
     read = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True)
@@ -114,5 +116,5 @@ def create_server(settings: Settings | None = None) -> FastMCP:
         except (HunyuanError, ValueError) as exc:
             raise ToolError(str(exc)) from None
 
-    register_service_tools(server, config)
+    register_capability_tool(server, config)
     return server
